@@ -1,0 +1,68 @@
+---
+title: "Comfortable Weather"
+author: "cbednarc"
+date: "January 2, 2020"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+##Overview
+###You're planning on visiting a new city, but you're not sure if the weather will be comfortable that day. This application will tell you the probability based on your own personal range of comfortable temperatures.
+
+
+
+
+##How It Works
+###The user selects a city from the list and the month and day they plan to visit. They also select the upper and lower limits on the temperature range for which they consider to be comfortable. Then, historical weather data from the National Oceanic and Atmospheric Administration (NOAA) is analyzed to determine the probability the temperature on that date is within the user-define comfortable range.
+#### *Check it out at https://cbednarc.shinyapps.io/weatherprobability/ *
+
+
+
+##Data
+####The data used for analysis are daily average temperatures from 10 of the largest cities in the United States for the last 30 years. The source of the data is the National Centers for Environmental Information (NCEI, https://www.ncei.noaa.gov/), part of the National Oceanic and Atmospheric Administration (NOAA).
+| Cities |
+| --- | --- | --- | ---
+| | New York NY | Los Angeles CA | Chicago IL | Miami FL |
+| | Philadelphia, PA | Boston, MA | Dallas, TX | Houston, TX |
+| | Washington, DC | Atlanta, GA | | |
+
+
+
+
+##Example
+####John is interested in visiting Chicago on 23 August. His personal comfortable average temperature range is 60 - 75 deg F.
+```{r}
+input = list(city="Chicago", month=8, day=23, tempLow=60, tempHigh=75)
+library(data.table)
+inputFile = "weatherData_slim.csv"
+stationNamesFile = "stationNames.csv"
+wxdata = fread(inputFile)
+stations = fread(stationNamesFile, sep=",")
+wxdata[,TAVG:=(TMIN+TMAX)/2]
+for (i in 1:nrow(stations)) {
+     wxdata[STATION==stations$STATION[i],City:=stations$CITY[i]]
+}
+wxdata[,Date:=as.Date(DATE)]
+wxdata[,`:=`(Month=as.integer(format(Date,"%m")),Day=as.integer(format(Date,"%d")))]
+wxdata = wxdata[,.(City,Month,Day,TAVG)]
+wxdata = wxdata[!is.na(TAVG),]
+ymin = 10
+ymax = 95
+x = wxdata[City==input$city & Month==input$month & Day==input$day,TAVG]
+probComfort = round(100*sum(x>=input$tempLow & x<=input$tempHigh)/length(x), 0)
+```
+####He has a **`r probComfort`%** chance of being comfortable based on historical data.
+```{r}
+if (length(x) > 0 & input$tempLow < input$tempHigh) {
+          boxplot(x, ylim=c(ymin,ymax), ylab="Average Temperature (deg F)", main=paste0("Distribution of Average Temperature\nMonth ",input$month," , Day ",input$day,", ",input$city))
+          abline(h=input$tempLow, col="blue", lwd=3)
+          text(0.5, input$tempLow-5, input$tempLow, col="blue", adj=0)
+          abline(h=input$tempHigh, col="red", lwd=3)
+          text(0.5, input$tempHigh+5, input$tempHigh, col="red", adj=0)
+          text(0.5, ymax, paste0("Probability of\nBeing Comfortable: ",probComfort,"%"), adj=c(0,1))
+     }
+```
+
